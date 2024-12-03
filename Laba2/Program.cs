@@ -148,7 +148,7 @@ public class Program
     static (double[], int) MinResidualMethod(double[] x0, double[,] A, double[] b, int maxIterations = 1000)
     {
         double[] x = (double[])x0.Clone();
-        double[] r = Multiply(A, x).Zip(b, (a, bVal) => a - bVal).ToArray();
+        double[] r = Multiply(A, x).Zip(b, (a, bVal) => a - bVal).ToArray(); //Вектор невязок
 
         for (int iterations = 0; iterations < maxIterations; iterations++)
         {
