@@ -1,114 +1,272 @@
-﻿const int SIZE = 15;
-const int GROUP_NUMBER = 2;
-const double EPSILON = 1e-5;
+﻿using System;
 
-var matrix = BuildMatrix(SIZE);
-var solution = BuildStarterSolution(GROUP_NUMBER, SIZE);
-var rightPart = RandomRightPart(SIZE);
-
-var (B, d) = ConvertToIterativeForm(matrix, rightPart);
-
-var 
-
-
-
-
-
-static double[] MultiplyMatrixByVector(double[][] matrix, double[] vector)
+public class Program
 {
-    int rows = SIZE;
-    int cols = SIZE;
+    private const double EPSILON = 1e-5;
+    private const int N = 15;
+    private const double FIVE = 5;
+    private static readonly double[] X = { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
 
-    double[] result = new double[rows];
-
-    for (int i = 0; i < rows; i++)
+    // Метод для вычисления спектральной нормы матрицы
+    public static double CalculateSpectralNorm(double[,] matrix)
     {
-        result[i] = 0;
-        for (int j = 0; j < cols; j++)
+        double[] x = InitializeX(1);
+        double[] y = new double[N];
+        double lambdaPrev = 0;
+        double lambda;
+        double norm;
+
+        do
         {
-            result[i] += matrix[i][j] * vector[j];
-        }
+            for (int i = 0; i < N; i++)
+            {
+                y[i] = 0;
+                for (int j = 0; j < N; j++)
+                {
+                    y[i] += matrix[i, j] * x[j];
+                }
+            }
+
+            lambda = 0;
+            for (int i = 0; i < N; i++)
+            {
+                lambda = Math.Max(lambda, Math.Abs(y[i]));
+            }
+
+            for (int i = 0; i < N; i++)
+            {
+                x[i] = y[i] / lambda;
+            }
+
+            norm = Math.Abs(lambda - lambdaPrev);
+            lambdaPrev = lambda;
+        } while (norm > EPSILON);
+
+        return lambda;
     }
 
-    return result;
-}
-
-static (double[][], double[]) ConvertToIterativeForm(double[][] A, double[] b)
-{
-    int n = SIZE;
-    double[][] B = new double[n][];
-    double[] d = new double[n];
-
-    for (int i = 0; i < n; i++)
+    // Вычисление нормы разности между точным результатом и найденным
+    private static double FindNormResult(double[] x)
     {
-        B[i] = new double[n];
-        for (int j = 0; j < n; j++)
+        double normMax = 0.0;
+        for (int i = 0; i < N; i++)
         {
-            if (i != j)
+            if (normMax < Math.Abs(X[i] - x[i]))
             {
-                B[i][j] = -A[i][j] / A[i][i];
+                normMax = Math.Abs(X[i] - x[i]);
+            }
+        }
+        return normMax;
+    }
+
+    // Инициализация x
+    private static double[] InitializeX(double value)
+    {
+        double[] x = new double[N];
+        for (int i = 0; i < N; i++)
+        {
+            x[i] = value;
+        }
+        return x;
+    }
+
+    // Решение системы методом простой итерации
+    public static int SolveBySimpleIteration(double[,] B, double[] b, double[] x, double normB)
+    {
+        double[] xNew = new double[N];
+        int numberIterations = 0;
+        double normDiff;
+
+        do
+        {
+            normDiff = 0.0;
+            for (int i = 0; i < N; i++)
+            {
+                double sum = 0.0;
+                for (int j = 0; j < N; j++)
+                {
+                    sum += B[i, j] * x[j];
+                }
+                xNew[i] = b[i] + sum;
+                normDiff += Math.Abs(xNew[i] - x[i]);
+            }
+
+            Array.Copy(xNew, x, N);
+            numberIterations++;
+        } while (normDiff * normB / (1 - normB) > EPSILON);
+
+        Console.WriteLine("Метод простой итерации");
+        Console.WriteLine("Решение найдено за " + numberIterations + " итераций.");
+        Console.WriteLine("Решение:");
+        for (int i = 0; i < N; i++)
+        {
+            Console.WriteLine($"x[{i}] = {x[i]}");
+        }
+
+        double normRes = FindNormResult(x);
+        Console.WriteLine(normRes);
+
+        return numberIterations;
+    }
+
+    // Решение системы методом Зейделя
+    private static void SolveBySeidel(double[,] B, double[] b, double[] x, int numberIterations)
+    {
+        double[] xNew = new double[N];
+        for (int k = 0; k < numberIterations; k++)
+        {
+            for (int i = 0; i < N; i++)
+            {
+                double sum = 0.0;
+                for (int j = i; j < N; j++)
+                {
+                    sum += B[i, j] * x[j];
+                }
+
+                for (int j = 0; j < i; j++)
+                {
+                    sum += B[i, j] * xNew[j];
+                }
+                xNew[i] = b[i] + sum;
+            }
+
+            Array.Copy(xNew, x, N);
+        }
+
+        Console.WriteLine("Метод Зейделя");
+        Console.WriteLine("Решение найдено за " + numberIterations + " итераций.");
+        Console.WriteLine("Решение:");
+        for (int i = 0; i < N; i++)
+        {
+            Console.WriteLine($"x[{i}] = {x[i]}");
+        }
+
+        double normRes = FindNormResult(x);
+        Console.WriteLine(normRes);
+    }
+
+    // Решение системы методом минимальных невязок
+    static (double[], int) MinResidualMethod(double[] x0, double[,] A, double[] b, int maxIterations = 1000)
+    {
+        double[] x = (double[])x0.Clone();
+        double[] r = Multiply(A, x).Zip(b, (a, bVal) => a - bVal).ToArray();
+
+        for (int iterations = 0; iterations < maxIterations; iterations++)
+        {
+            double tao = Multiply(A, r).Zip(r, (a, bVal) => a * bVal).Sum() / Math.Pow(Norm(Multiply(A, r)), 2);
+            double[] xNew = x.Zip(r, (xVal, rVal) => xVal - tao * rVal).ToArray();
+
+            r = Multiply(A, xNew).Zip(b, (a, bVal) => a - bVal).ToArray();
+            if (Norm(r) < EPSILON)
+            {
+                Console.WriteLine("Метод минимальных невязок");
+                Console.WriteLine("Решение найдено за " + iterations + " итераций.");
+                Console.WriteLine("Решение:");
+                for (int i = 0; i < N; i++)
+                {
+                    Console.WriteLine($"x[{i}] = {x[i]}");
+                }
+
+                double normRes = FindNormResult(x);
+                Console.WriteLine(normRes);
+
+                return (xNew, iterations + 1);
+            }
+            x = xNew;
+        }
+        throw new InvalidOperationException("Метод не сошелся за заданное количество итераций");
+    }
+
+    static double Norm(double[] vector)
+    {
+        return Math.Sqrt(vector.Sum(v => v * v));
+    }
+
+    static double[] Multiply(double[,] A, double[] x)
+    {
+        double[] result = new double[N];
+        for (int i = 0; i < N; i++)
+        {
+            result[i] = Enumerable.Range(0, N).Sum(j => A[i, j] * x[j]);
+        }
+        return result;
+    }
+
+    // Решение системы
+    public static void Solve(double[,] A, double[] b, double[] x)
+    {
+        double[] bNew = new double[N];
+
+        // Вычисление нормы матрицы A
+        double normA = CalculateSpectralNorm(A);
+
+        double e = 1;
+        double normB = 0;
+        double[,] B = new double[N, N];
+
+        for (int i = 0; i < N; i++)
+        {
+            for (int j = 0; j < N; j++)
+            {
+                B[i, j] = (i != j) ? -A[i, j] / normA
+                                   : e - A[i, j] / normA;
+            }
+
+            bNew[i] = b[i] / normA;
+
+            if (normB < Math.Abs(bNew[i]))
+            {
+                normB = Math.Abs(bNew[i]);
             }
         }
 
-        d[i] = b[i] / A[i][i];
+        // Вычисление нормы матрицы B
+        double normBValue = CalculateSpectralNorm(B);
+
+        double aprioriEstimate = Math.Log(((1 - normBValue) * EPSILON) / normB) / Math.Log(normBValue);
+        int iterationsNeeded = (int)Math.Ceiling(aprioriEstimate);
+        Console.WriteLine("Рассчитанное число итераций: " + iterationsNeeded);
+
+        int numberIteration = SolveBySimpleIteration(B, bNew, x, normBValue);
+
+        x = InitializeX(0);
+        SolveBySeidel(B, bNew, x, numberIteration);
+
+        x = InitializeX(0);
+        MinResidualMethod(x, A, b); // Здесь заменен метод градиентного спуска
     }
 
-    return (B, d);
-}
-
-static double[] BuildStarterSolution(int groupNumber = 2, int size = 15)
-{
-    var x = new double[SIZE];
-    for(int i = 0; i < SIZE; i++)
+    public static void Main(string[] args)
     {
-        x[i] = groupNumber + i;
-    }
+        double[,] A = new double[N, N];
+        double[] b = new double[N];
+        double[] x = new double[N];
 
-    return x;
-}
-
-static double[] RandomRightPart(int size = 15)
-{
-    var b = new double[SIZE];
-    for (int i = 0; i < SIZE; i++)
-    {
-        b[i] = Random.Shared.NextDouble()*20;
-    }
-
-    return b;
-}
-
-static double[][] BuildMatrix(int size = 15)
-{
-    double[][] matrix = new double[size][];
-
-    for (int i = 0; i < size; i++)
-    {
-        matrix[i] = new double[size];
-        for (int j = 0; j < size; j++)
+        for (int i = 0; i < N; i++)
         {
-            if (i == j)
+            for (int j = 0; j < N; j++)
             {
-                matrix[i][j] = 5 * (i+1);
-                continue;
+                if (i == j)
+                {
+                    A[i, j] = 5 * (i + 1);
+                    continue;
+                }
+
+                A[i, j] = 0.1 * (i + 1) * (j + 1);
             }
-
-            matrix[i][j] = 0.1 * (i+1) * (j+1);
         }
-    }
 
-    return matrix;
-}
-
-static void WriteMatrix(double[][] matrix)
-{
-    foreach (var arr in matrix)
-    {
-        foreach (var item in arr)
+        for (int i = 0; i < N; i++)
         {
-            Console.Write(double.Round(item, 2) + "\t");
+            double sum = 0.0;
+            for (int j = 0; j < N; j++)
+            {
+                sum += A[i, j] * X[j];
+            }
+            b[i] = sum;
+            x[i] = 0;
         }
 
-        Console.WriteLine();
+        Solve(A, b, x);
     }
 }
