@@ -4,7 +4,6 @@ public class Program
 {
     private const double EPSILON = 1e-5;
     private const int N = 15;
-    private const double FIVE = 5;
     private static readonly double[] X = { 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
 
     // Метод для вычисления спектральной нормы матрицы
